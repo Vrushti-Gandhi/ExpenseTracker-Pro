@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Expense Tracker Pro</title>
+
+<link rel="stylesheet" href="style.css">
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+</head>
+<body>
+
+<div class="container">
+
+    <h1>💰 Expense Tracker Pro</h1>
+
+    <button id="darkModeBtn">
+        🌙 Dark Mode
+    </button>
+
+    <div class="summary">
+
+        <div class="card balance-card">
+            <h3>Balance</h3>
+            <h2 id="balance">₹0</h2>
+        </div>
+
+        <div class="card income-card">
+            <h3>Total Income</h3>
+            <h2 id="income">₹0</h2>
+        </div>
+
+        <div class="card expense-card">
+            <h3>Total Expense</h3>
+            <h2 id="expense">₹0</h2>
+        </div>
+
+    </div>
+
+    <div class="form-container">
+
+        <input
+            type="text"
+            id="description"
+            placeholder="Description">
+
+        <input
+            type="number"
+            id="amount"
+            placeholder="Amount">
+
+        <input
+            type="date"
+            id="date">
+
+        <select id="type">
+            <option value="income">Income</option>
+            <option value="expense">Expense</option>
+        </select>
+
+        <select id="category">
+            <option>Food</option>
+            <option>Travel</option>
+            <option>Shopping</option>
+            <option>Education</option>
+            <option>Health</option>
+            <option>Other</option>
+        </select>
+
+        <button id="addBtn">
+            Add Transaction
+        </button>
+
+    </div>
+
+    <div class="chart-section">
+
+        <h2>Expense Analysis</h2>
+
+        <canvas id="expenseChart"></canvas>
+
+    </div>
+
+    <div class="history">
+
+        <h2>Transaction History</h2>
+
+        <ul id="transactionList"></ul>
+
+    </div>
+
+</div>
+
+<script src="script.js"></script>
+
+</body>
+</html>
