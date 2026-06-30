@@ -1,324 +1,250 @@
-const description = document.getElementById("description");
-const amount = document.getElementById("amount");
-const date = document.getElementById("date");
-const type = document.getElementById("type");
-const category = document.getElementById("category");
-const addBtn = document.getElementById("addBtn");
+const balanceEl = document.getElementById('balance');
+const incomeEl = document.getElementById('income');
+const expenseEl = document.getElementById('expense');
+const descriptionInput = document.getElementById('description');
+const amountInput = document.getElementById('amount');
+const dateInput = document.getElementById('date');
+const typeSelect = document.getElementById('type');
+const categorySelect = document.getElementById('category');
+const addBtn = document.getElementById('addBtn');
+const transactionList = document.getElementById('transactionList');
+const darkModeBtn = document.getElementById('darkModeBtn');
+const expenseChartCanvas = document.getElementById('expenseChart');
 
-const balanceEl = document.getElementById("balance");
-const incomeEl = document.getElementById("income");
-const expenseEl = document.getElementById("expense");
+let transactions = [];
+let chartInstance = null;
 
-const transactionList = document.getElementById("transactionList");
-
-const darkModeBtn = document.getElementById("darkModeBtn");
-
-let transactions =
-JSON.parse(localStorage.getItem("transactions")) || [];
-
-let editIndex = -1;
-
-let chart;
-
-/* --------------------------
-   SAVE DATA
--------------------------- */
-
-function saveData() {
-
-    localStorage.setItem(
-        "transactions",
-        JSON.stringify(transactions)
-    );
+function formatCurrency(value) {
+    return `₹${value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-/* --------------------------
-   SUMMARY
--------------------------- */
+function getSummary() {
+    const income = transactions
+        .filter(tx => tx.type === 'income')
+        .reduce((sum, tx) => sum + tx.amount, 0);
+
+    const expense = transactions
+        .filter(tx => tx.type === 'expense')
+        .reduce((sum, tx) => sum + tx.amount, 0);
+
+    const balance = income - expense;
+    return { income, expense, balance };
+}
+
+function getCategoryTotals() {
+    const categories = {};
+    transactions
+        .filter(tx => tx.type === 'expense')
+        .forEach(tx => {
+            categories[tx.category] = (categories[tx.category] || 0) + tx.amount;
+        });
+    return categories;
+}
+
+function saveTransactions() {
+    localStorage.setItem('expenseTrackerTransactions', JSON.stringify(transactions));
+}
+
+function loadTransactions() {
+    const stored = localStorage.getItem('expenseTrackerTransactions');
+    if (!stored) return;
+    try {
+        transactions = JSON.parse(stored);
+    } catch {
+        transactions = [];
+    }
+}
 
 function updateSummary() {
-
-    let income = 0;
-    let expense = 0;
-
-    transactions.forEach((transaction) => {
-
-        if(transaction.type === "income") {
-            income += transaction.amount;
-        } else {
-            expense += transaction.amount;
-        }
-
-    });
-
-    balanceEl.textContent = `₹${income - expense}`;
-    incomeEl.textContent = `₹${income}`;
-    expenseEl.textContent = `₹${expense}`;
+    const { income, expense, balance } = getSummary();
+    balanceEl.textContent = formatCurrency(balance);
+    incomeEl.textContent = formatCurrency(income);
+    expenseEl.textContent = formatCurrency(expense);
 }
 
-/* --------------------------
-   PIE CHART
--------------------------- */
+function createTransactionListItem(tx) {
+    const li = document.createElement('li');
+    li.classList.add(tx.category.toLowerCase());
 
-function updateChart() {
+    const info = document.createElement('div');
+    info.className = 'transaction-info';
 
-    const categoryData = {};
+    const description = document.createElement('strong');
+    description.textContent = tx.description;
+    info.appendChild(description);
 
-    transactions.forEach((transaction) => {
+    const meta = document.createElement('span');
+    meta.className = 'transaction-date';
+    meta.textContent = `${tx.date} • ${tx.category} • ${tx.type === 'income' ? 'Income' : 'Expense'}`;
+    info.appendChild(meta);
 
-        if(transaction.type === "expense") {
+    const amountLabel = document.createElement('div');
+    amountLabel.textContent = tx.type === 'income' ? `+${formatCurrency(tx.amount)}` : `-${formatCurrency(tx.amount)}`;
+    amountLabel.style.fontWeight = '700';
+    amountLabel.style.color = tx.type === 'income' ? '#2ecc71' : '#e74c3c';
 
-            categoryData[transaction.category] =
-                (categoryData[transaction.category] || 0)
-                + transaction.amount;
-        }
+    const actions = document.createElement('div');
+    actions.className = 'action-buttons';
 
-    });
+    const editBtn = document.createElement('button');
+    editBtn.className = 'edit-btn';
+    editBtn.textContent = 'Edit';
+    editBtn.addEventListener('click', () => editTransaction(tx.id));
 
-    const labels = Object.keys(categoryData);
-    const values = Object.values(categoryData);
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'delete-btn';
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.addEventListener('click', () => removeTransaction(tx.id));
 
-    const ctx =
-    document.getElementById("expenseChart");
-
-    if(chart){
-        chart.destroy();
-    }
-
-    chart = new Chart(ctx, {
-
-        type: "pie",
-
-        data: {
-
-            labels: labels,
-
-            datasets: [{
-
-                data: values
-
-            }]
-        }
-    });
+    actions.append(editBtn, deleteBtn);
+    li.append(info, amountLabel, actions);
+    return li;
 }
-
-/* --------------------------
-   RENDER TRANSACTIONS
--------------------------- */
 
 function renderTransactions() {
+    transactionList.innerHTML = '';
+    if (transactions.length === 0) {
+        const empty = document.createElement('li');
+        empty.textContent = 'No transactions added yet.';
+        empty.style.justifyContent = 'center';
+        empty.style.color = '#7f8c8d';
+        transactionList.appendChild(empty);
+        return;
+    }
 
-    transactionList.innerHTML = "";
-
-    transactions.forEach((transaction, index) => {
-
-        const li =
-        document.createElement("li");
-
-        li.classList.add(
-            transaction.category.toLowerCase()
-        );
-
-        li.innerHTML = `
-
-        <div class="transaction-info">
-
-            <strong>
-            ${transaction.type === "income"
-            ? "🟢"
-            : "🔴"}
-
-            ${transaction.description}
-
-            </strong>
-
-            <span>
-            ${transaction.category}
-            | ₹${transaction.amount}
-            </span>
-
-            <span class="transaction-date">
-            ${transaction.date}
-            </span>
-
-        </div>
-
-        <div class="action-buttons">
-
-            <button
-            class="edit-btn"
-            onclick="editTransaction(${index})">
-
-            ✏️
-
-            </button>
-
-            <button
-            class="delete-btn"
-            onclick="deleteTransaction(${index})">
-
-            🗑️
-
-            </button>
-
-        </div>
-
-        `;
-
-        transactionList.appendChild(li);
-
-    });
-
-    updateSummary();
-    updateChart();
+    transactions
+        .slice()
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+        .forEach(tx => transactionList.appendChild(createTransactionListItem(tx)));
 }
 
-/* --------------------------
-   ADD / UPDATE
--------------------------- */
+function renderChart() {
+    const categoryTotals = getCategoryTotals();
+    const labels = Object.keys(categoryTotals);
+    const data = Object.values(categoryTotals);
 
-addBtn.addEventListener("click", () => {
+    if (chartInstance) {
+        chartInstance.destroy();
+    }
 
-    if(
-        description.value === "" ||
-        amount.value === "" ||
-        date.value === ""
-    ){
-        alert("Please fill all fields");
+    chartInstance = new Chart(expenseChartCanvas.getContext('2d'), {
+        type: 'doughnut',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Expenses by category',
+                data,
+                backgroundColor: [
+                    '#ff6384',
+                    '#36a2eb',
+                    '#ffcd56',
+                    '#4bc0c0',
+                    '#9966ff',
+                    '#ff9f40'
+                ],
+                borderWidth: 1,
+            }],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                },
+                tooltip: {
+                    callbacks: {
+                        label: (context) => {
+                            const value = context.raw;
+                            return `${context.label}: ${formatCurrency(value)}`;
+                        }
+                    }
+                }
+            }
+        },
+    });
+}
+
+function resetForm() {
+    descriptionInput.value = '';
+    amountInput.value = '';
+    dateInput.value = '';
+    typeSelect.value = 'income';
+    categorySelect.value = 'Food';
+}
+
+function addTransaction() {
+    const description = descriptionInput.value.trim();
+    const amount = Number(amountInput.value);
+    const date = dateInput.value;
+    const type = typeSelect.value;
+    const category = categorySelect.value;
+
+    if (!description || !amount || !date) {
+        alert('Please fill out description, amount, and date.');
         return;
     }
 
     const transaction = {
-
-        description:
-        description.value,
-
-        amount:
-        Number(amount.value),
-
-        date:
-        date.value,
-
-        type:
-        type.value,
-
-        category:
-        category.value
+        id: Date.now(),
+        description,
+        amount: Math.abs(amount),
+        date,
+        type,
+        category,
     };
 
-    if(editIndex === -1){
+    transactions.push(transaction);
+    saveTransactions();
+    updateApp();
+    resetForm();
+}
 
-        transactions.push(transaction);
+function editTransaction(id) {
+    const tx = transactions.find(item => item.id === id);
+    if (!tx) return;
 
-    }else{
+    descriptionInput.value = tx.description;
+    amountInput.value = tx.amount;
+    dateInput.value = tx.date;
+    typeSelect.value = tx.type;
+    categorySelect.value = tx.category;
 
-        transactions[editIndex] =
-        transaction;
+    transactions = transactions.filter(item => item.id !== id);
+    saveTransactions();
+    updateApp();
+}
 
-        editIndex = -1;
+function removeTransaction(id) {
+    transactions = transactions.filter(item => item.id !== id);
+    saveTransactions();
+    updateApp();
+}
 
-        addBtn.textContent =
-        "Add Transaction";
+function toggleDarkMode() {
+    document.body.classList.toggle('dark-mode');
+    const isDarkMode = document.body.classList.contains('dark-mode');
+    darkModeBtn.textContent = isDarkMode ? '☀️ Light Mode' : '🌙 Dark Mode';
+    localStorage.setItem('expenseTrackerDarkMode', isDarkMode ? 'dark' : 'light');
+}
+
+function loadDarkMode() {
+    const saved = localStorage.getItem('expenseTrackerDarkMode');
+    if (saved === 'dark') {
+        document.body.classList.add('dark-mode');
+        darkModeBtn.textContent = '☀️ Light Mode';
     }
+}
 
-    saveData();
-
+function updateApp() {
+    updateSummary();
     renderTransactions();
-
-    description.value = "";
-    amount.value = "";
-    date.value = "";
-});
-
-/* --------------------------
-   DELETE
--------------------------- */
-
-function deleteTransaction(index) {
-
-    const confirmDelete =
-    confirm(
-    "Are you sure you want to delete?"
-    );
-
-    if(confirmDelete){
-
-        transactions.splice(index,1);
-
-        saveData();
-
-        renderTransactions();
-    }
+    renderChart();
 }
 
-/* --------------------------
-   EDIT
--------------------------- */
+addBtn.addEventListener('click', addTransaction);
+darkModeBtn.addEventListener('click', toggleDarkMode);
 
-function editTransaction(index){
-
-    description.value =
-    transactions[index].description;
-
-    amount.value =
-    transactions[index].amount;
-
-    date.value =
-    transactions[index].date;
-
-    type.value =
-    transactions[index].type;
-
-    category.value =
-    transactions[index].category;
-
-    editIndex = index;
-
-    addBtn.textContent =
-    "Update Transaction";
-}
-
-/* --------------------------
-   DARK MODE
--------------------------- */
-
-if(
-localStorage.getItem("darkMode")
-=== "enabled"
-){
-    document.body.classList.add("dark");
-}
-
-darkModeBtn.addEventListener(
-"click",
-() => {
-
-    document.body.classList.toggle(
-    "dark"
-    );
-
-    if(
-    document.body.classList.contains(
-    "dark"
-    )
-    ){
-
-        localStorage.setItem(
-        "darkMode",
-        "enabled"
-        );
-
-    }else{
-
-        localStorage.setItem(
-        "darkMode",
-        "disabled"
-        );
-    }
-});
-
-/* --------------------------
-   INITIAL LOAD
--------------------------- */
-
-renderTransactions();
+loadTransactions();
+loadDarkMode();
+updateApp();
